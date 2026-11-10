@@ -214,7 +214,7 @@ git tag v0.1.0 && git push origin v0.1.0     # v0.2.0-beta.1 etc. are published 
 ```
 
 The release workflow then:
-- publishes **FreeLog.Logging** to GitHub Packages, and to nuget.org if the repo secret `NUGET_API_KEY` is set
+- publishes **FreeLog.Logging** to GitHub Packages, and to nuget.org once Trusted Publishing is set up (below)
 - pushes the relay image to **`ghcr.io/reetus/freelog-relay:<version>`** (and `:latest` for non-prereleases), amd64 + arm64
 - creates a GitHub release with the `.nupkg` attached
 
@@ -227,7 +227,18 @@ Consuming the package from GitHub Packages needs a token even though the repo is
 dotnet nuget add source https://nuget.pkg.github.com/Reetus/index.json -n reetus -u <github-user> -p <token> --store-password-in-clear-text
 ```
 
-nuget.org needs no auth, so set `NUGET_API_KEY` if other teams will consume the package.
+nuget.org needs no auth for consumers, so publish there if other teams will use the package.
+
+### Publishing to nuget.org (Trusted Publishing, no stored API key)
+
+One-time setup:
+1. Sign in at https://www.nuget.org (a Microsoft account). Your **profile name** is the username, not your email.
+2. Username menu → **Trusted Publishing** → add a policy: owner = you, repository owner `Reetus`, repository `freelog`,
+   workflow file `release.yml`, environment empty.
+3. In GitHub: repo **Settings → Secrets and variables → Actions → Variables** → `NUGET_USER` = your nuget.org profile name.
+
+The release workflow then requests a 1-hour API key via OIDC (`NuGet/login`) and pushes the `.nupkg` and `.snupkg`.
+Remove `NUGET_USER` to stop publishing there.
 
 ## Development
 

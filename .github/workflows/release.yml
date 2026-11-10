@@ -1,7 +1,8 @@
 name: Release
 
 # Push a tag like v0.2.0 (or v0.2.0-beta.1) to publish:
-#   - FreeLog.Logging to GitHub Packages (always) and nuget.org (when the NUGET_API_KEY secret is set)
+#   - FreeLog.Logging to GitHub Packages (always) and nuget.org (when the NUGET_USER repo variable is set;
+#     uses nuget.org Trusted Publishing, so no API key is stored: see README "Releases")
 #   - the relay image to ghcr.io/<owner>/freelog-relay
 #   - a GitHub release with the .nupkg attached
 on:
@@ -25,6 +26,10 @@ jobs:
   nuget:
     name: NuGet package
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # GitHub OIDC token for nuget.org Trusted Publishing
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -52,14 +57,20 @@ jobs:
           --api-key "${{ secrets.GITHUB_TOKEN }}"
           --skip-duplicate
 
+      # nuget.org Trusted Publishing: exchanges the job's OIDC token for an API key valid for 1 hour.
+      - name: nuget.org login
+        id: nuget-login
+        if: vars.NUGET_USER != ''
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push to nuget.org
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        if: env.NUGET_API_KEY != ''
+        if: vars.NUGET_USER != ''
         run: >
           dotnet nuget push "artifacts/*.nupkg"
           --source https://api.nuget.org/v3/index.json
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --skip-duplicate
 
       - uses: actions/upload-artifact@v7
