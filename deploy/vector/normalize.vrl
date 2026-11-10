@@ -100,8 +100,10 @@ if starts_with(line, "{") {
     . = merge(., p)
   }
 } else {
-  # MEL simple console: "info: Category[0]" header line, message on the following (indented) line.
-  m, err = parse_regex(raw, r'^(?P<lvl>trce|dbug|info|warn|fail|crit): (?P<cat>[^\s\[]+)\[(?P<eid>\d+)\]\s*\n?\s*(?P<rest>(?s:.*))$')
+  # MEL simple console: "info: Category[0]" then the message, either on the following (indented) line or,
+  # with SingleLine = true, on the same line. An optional TimestampFormat prefix ("05:01:18 ",
+  # "2026-11-10 05:01:18 ", "[05:01:18] ") may come first.
+  m, err = parse_regex(raw, r'^(?:\[?[0-9][0-9:.\-T/ +Z]*\]?\s+)?(?P<lvl>trce|dbug|info|warn|fail|crit): (?P<cat>[^\s\[]+)\[(?P<eid>\d+)\]\s*\n?\s*(?P<rest>(?s:.*))$')
   if err == null {
     level = m.lvl
     ."category.name" = m.cat

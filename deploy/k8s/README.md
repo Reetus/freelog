@@ -34,6 +34,9 @@ secretGenerator:
 
 Apps in the cluster send to `http://<key>@relay.freelog.svc:8080/<projectId>`.
 
+**First logs take 1–2 minutes** after Vector starts: it discovers pod log files on a cooldown, then reads each file's
+existing backlog. Empty query results right after a restart are expected.
+
 ## Option 2: Helm charts
 
 ```sh

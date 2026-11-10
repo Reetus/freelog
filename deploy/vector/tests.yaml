@@ -100,6 +100,38 @@ tests:
               assert_eq!(."category.name", "Microsoft.AspNetCore.Server.Kestrel")
               assert!(starts_with!(.message, "Connection id"))
 
+  - name: MEL single-line console with timestamp prefix
+    inputs:
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: "04:16:18 warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35] No XML encryptor configured."
+          container_name: vsapi
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: "2026-11-10 05:01:18 fail: VendorSearch.API.Import[0] Import failed"
+          container_name: vsapi
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: "[05:01:18] info: VendorSearch.API.Import[0] Import finished"
+          container_name: vsapi
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert!(includes(["warn", "error", "info"], .level))
+              if .level == "warn" {
+                assert_eq!(."category.name", "Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager")
+                assert_eq!(.message, "No XML encryptor configured.")
+              } else if .level == "error" {
+                assert_eq!(.message, "Import failed")
+              } else {
+                assert_eq!(.message, "Import finished")
+              }
+
   - name: Generic JSON keeps app fields and explicit service
     inputs:
       - insert_at: docker_meta
