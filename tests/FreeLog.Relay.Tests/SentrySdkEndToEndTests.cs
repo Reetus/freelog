@@ -12,6 +12,7 @@ namespace FreeLog.Relay.Tests;
 /// Uses the real Sentry .NET SDK (via <see cref="FreeLogExtensions.AddFreeLog{TBuilder}"/>) against the
 /// in-memory relay, so the test covers the SDK's actual wire format, compression and auth header.
 /// </summary>
+[Collection(SentrySdkCollection.Name)]
 public class SentrySdkEndToEndTests(ITestOutputHelper output) : IDisposable
 {
     private readonly TestRelay _relay = new();

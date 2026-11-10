@@ -37,6 +37,7 @@ check "SDK path: structured log with template fields"   'service:demo-sdk source
 check "SDK path: exception fields on errors"            'service:demo-sdk level:error exception.type:*'           || failed=1
 check "Console path: JSON fields extracted by Vector"   'service:demo-console source:container OrderId:* RequestId:*' || failed=1
 check "Console path: exception stack trace as a field"  'service:demo-console level:error exception.stacktrace:InvalidOperationException' || failed=1
+check "SDK path: custom metrics stored"                  'kind:metric metric.name:orders.placed region:*'         || failed=1
 check "Relay's own logs collected"                       'service:freelog-relay'                                   || failed=1
 
 if [ "$failed" != 0 ]; then

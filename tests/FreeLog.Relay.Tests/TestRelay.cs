@@ -98,3 +98,10 @@ public sealed class TestRelay : WebApplicationFactory<Program>
         });
     }
 }
+
+/// <summary>Tests that initialize the global <c>SentrySdk</c> must not run in parallel with each other.</summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class SentrySdkCollection
+{
+    public const string Name = "SentrySdk (global state)";
+}

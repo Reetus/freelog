@@ -115,6 +115,34 @@ pointed at the relay, leave `EnableLogs` off (otherwise every log is sent twice)
 Distribute the package with `dotnet pack src/FreeLog.Logging -c Release -o artifacts` and push it to your NuGet feed,
 or reference the project directly. It targets net8.0 and net10.0.
 
+## Custom metrics from code
+
+Similar to CloudWatch custom metrics: emit values with the Sentry SDK's metrics API (works with Option B or C,
+no extra setup), and the relay stores each value as a record in VictoriaLogs (`kind=metric`). You aggregate at query time.
+
+```csharp
+SentrySdk.Metrics.EmitCounter("orders.placed", 1, [new KeyValuePair<string, object>("region", "eu")], null);
+SentrySdk.Metrics.EmitGauge("queue.depth", queue.Count);
+SentrySdk.Metrics.EmitDistribution("checkout.duration", elapsed.TotalMilliseconds, "millisecond");
+```
+
+Stored fields: `metric.name`, `metric.type` (`counter`/`gauge`/`distribution`), `metric.value`, `metric.unit`, the
+attributes you pass (`region`), plus `service`, `env`, `release` and `trace_id`, so a metric can be joined to the logs of the
+same request.
+
+```
+kind:metric metric.name:orders.placed | stats by (_time:5m, region) sum(metric.value) orders
+kind:metric metric.name:checkout.duration _time:24h | stats by (_time:1h) quantile(0.95, metric.value) p95, avg(metric.value) avg
+kind:metric metric.name:queue.depth | stats by (_time:1m) max(metric.value) depth
+kind:metric | stats by (service, metric.name) count() values     # which metrics exist
+-kind:metric service:orders-api                                    # logs only, without metric records
+```
+
+Good for business and app-level metrics, up to a few per request. Each value is one row, so it's not meant for
+per-cache-hit or per-request instrumentation at high volume. For that, use `System.Diagnostics.Metrics` with an OpenTelemetry
+exporter and a time-series database such as VictoriaMetrics. The SDK does **not** forward `System.Diagnostics.Metrics`
+instruments on its own: only explicit `SentrySdk.Metrics` calls are sent (covered by a test).
+
 ## Error tracking with GlitchTip (optional)
 
 Logs answer "what happened"; GlitchTip answers "what's broken": identical exceptions are grouped into one issue with

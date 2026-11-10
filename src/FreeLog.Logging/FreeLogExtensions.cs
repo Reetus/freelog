@@ -97,6 +97,11 @@ public static class FreeLogExtensions
                     log.SetAttribute("service.name", service);
                     return log;
                 });
+                o.SetBeforeSendMetric(metric =>
+                {
+                    metric.SetAttribute("service.name", service);
+                    return metric;
+                });
             }
         });
 

@@ -19,6 +19,8 @@ so queries work the same regardless of how a log arrived.
 | `host` | `docker-host-1` / node name | container path |
 | `container_name`, `image`, `compose_project`, `namespace`, `pod` | | container path |
 | `release` | `orders@1.2.3` | SDK path |
+| `kind` | `metric` | only on metric records (`SentrySdk.Metrics`); logs have no `kind` |
+| `metric.name`, `metric.type`, `metric.value`, `metric.unit` | `checkout.duration`, `distribution`, `125.5`, `millisecond` | metric records |
 | *anything else* | `OrderId`, `RequestId`, … | template parameters, scopes, extra JSON fields |
 
 Stream fields (VictoriaLogs' grouping key, keep them low-cardinality): `service`, `env`, plus `host` (Docker) or `namespace` (k8s).

@@ -4,6 +4,7 @@ using FreeLog.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Sentry;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddFreeLog();
@@ -21,6 +22,11 @@ internal sealed class OrderSimulator(ILogger<OrderSimulator> logger) : Backgroun
             using (logger.BeginScope(new Dictionary<string, object> { ["RequestId"] = Guid.NewGuid().ToString("N")[..12] }))
             {
                 logger.LogInformation("Order {OrderId} placed by {Customer} for {Amount:F2}", orderId, "customer-" + orderId % 7, orderId % 97 + 0.99);
+
+                // Custom metrics (no-ops when FreeLog:Dsn isn't set).
+                var region = orderId % 3 == 0 ? "us" : "eu";
+                SentrySdk.Metrics.EmitCounter("orders.placed", 1, [new KeyValuePair<string, object>("region", region)], null);
+                SentrySdk.Metrics.EmitDistribution("checkout.duration", 80 + orderId % 400, "millisecond");
 
                 if (orderId % 5 == 0)
                     logger.LogWarning("Payment provider slow for order {OrderId}: {ElapsedMs} ms", orderId, 1500 + orderId % 300);

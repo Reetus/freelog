@@ -8,13 +8,14 @@ namespace FreeLog.Relay;
 
 /// <summary>
 /// <c>POST /api/{projectId}/envelope/</c> — the endpoint a Sentry SDK sends to when its DSN is
-/// <c>https://{key}@{relay-host}/{projectId}</c>. Log items are queued for VictoriaLogs. Errors, transactions
+/// <c>https://{key}@{relay-host}/{projectId}</c>. Log and trace_metric items are queued for VictoriaLogs. Errors, transactions
 /// and feedback are forwarded to the project's <c>ForwardDsn</c> (e.g. GlitchTip) when set; everything else
 /// (sessions, client reports, …) is acknowledged and dropped.
 /// </summary>
 public static class EnvelopeEndpoint
 {
     private const string LogItemType = "log";
+    private const string MetricItemType = "trace_metric";
 
     public static async Task<IResult> HandleAsync(
         string projectId,
@@ -65,6 +66,25 @@ public static class EnvelopeEndpoint
 
         foreach (var item in envelope.Items)
         {
+            if (item.Type == MetricItemType)
+            {
+                try
+                {
+                    foreach (var record in LogRecordMapper.MapMetricItem(item.Payload, project))
+                    {
+                        metrics.Inc(ref metrics.MetricsReceived);
+                        queue.TryEnqueue(new PendingRecord(target, record));
+                    }
+                }
+                catch (EnvelopeFormatException ex)
+                {
+                    metrics.Inc(ref metrics.EnvelopesInvalid);
+                    logger.LogDebug(ex, "Skipped malformed metric item for project {ProjectId}", projectId);
+                }
+
+                continue;
+            }
+
             if (item.Type != LogItemType)
             {
                 if (forwardTarget is not null && opts.Forwarding.ItemTypes.Contains(item.Type))

@@ -10,6 +10,7 @@ public sealed class RelayMetrics
     public long EnvelopesUnauthorized;
     public long EnvelopesInvalid;
     public long LogsReceived;
+    public long MetricsReceived;
     public long LogsWritten;
     public long LogsDroppedQueueFull;
     public long LogsDroppedSinkFailure;
@@ -36,7 +37,8 @@ public sealed class RelayMetrics
             ("outcome=\"unauthorized\"", EnvelopesUnauthorized),
             ("outcome=\"invalid\"", EnvelopesInvalid));
         Counter(sb, "freelog_logs_received_total", "Log records parsed from envelopes.", ("", LogsReceived));
-        Counter(sb, "freelog_logs_written_total", "Log records written to the sink.", ("", LogsWritten));
+        Counter(sb, "freelog_metrics_received_total", "Metric values (trace_metric) parsed from envelopes.", ("", MetricsReceived));
+        Counter(sb, "freelog_logs_written_total", "Records (logs and metric values) written to the sink.", ("", LogsWritten));
         Counter(sb, "freelog_logs_dropped_total", "Log records dropped.",
             ("reason=\"queue_full\"", LogsDroppedQueueFull),
             ("reason=\"sink_failure\"", LogsDroppedSinkFailure));
