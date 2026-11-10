@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
 
   vector:
-    image: timberio/vector:0.60.0-debian
+    image: timberio/vector:0.61.0-debian
     environment:
       FREELOG_ENV: ${FREELOG_ENV:-default}
       FREELOG_HOST: ${FREELOG_HOST:-docker-host}
