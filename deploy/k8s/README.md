@@ -4,6 +4,38 @@ Vector runs as a DaemonSet that tails `/var/log/pods` (what `kubectl logs` reads
 VictoriaLogs runs as a single StatefulSet. The relay is optional in-cluster; most setups run it next to
 VictoriaLogs and expose it to apps.
 
+Two ways to install: **plain manifests** (no Helm needed) or the **Helm charts**.
+
+## Option 1: plain manifests (`manifests/`)
+
+VictoriaLogs (StatefulSet, 12Gi volume, 14d / 10GiB retention), Vector (DaemonSet + RBAC) and the relay.
+
+```sh
+# 1. Relay projects/keys (keys: openssl rand -hex 16); see deploy/compose/relay.example.json
+kubectl create namespace freelog
+kubectl -n freelog create secret generic freelog-relay-config --from-file=relay.json=./relay.json
+
+# 2. Everything else
+kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/manifests | kubectl apply -f -
+```
+
+The relay image defaults to `ghcr.io/reetus/freelog-relay:latest`, which is published by the release workflow.
+For a node-specific setup (pinning, a locally built image, the Secret from a file), add an overlay:
+
+```yaml
+# deploy/k8s/overlays/<name>/kustomization.yaml
+resources: [../../manifests]
+namespace: freelog
+images:
+  - { name: ghcr.io/reetus/freelog-relay, newName: freelog-relay, newTag: local }
+secretGenerator:
+  - { name: freelog-relay-config, files: [relay.json] }   # relay.json is gitignored
+```
+
+Apps in the cluster send to `http://<key>@relay.freelog.svc:8080/<projectId>`.
+
+## Option 2: Helm charts
+
 ```sh
 kubectl create namespace freelog
 

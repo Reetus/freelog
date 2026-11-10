@@ -1,0 +1,17 @@
+# Plain-manifest install (no Helm). Vector config and VRL are shared with the rest of the repo,
+# so build with the load restrictor off:
+#   kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/manifests | kubectl apply -f -
+# The relay also needs the Secret "freelog-relay-config" (see ../README.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: freelog
+resources:
+  - namespace.yaml
+  - victorialogs.yaml
+  - vector.yaml
+  - relay.yaml
+configMapGenerator:
+  - name: freelog-vector-config
+    files: [../vector-agent.yaml]
+  - name: freelog-vector-vrl
+    files: [../../vector/normalize.vrl]

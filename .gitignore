@@ -6,3 +6,4 @@ TestResults/
 deploy/compose/relay.json
 deploy/compose/.env
 artifacts/
+deploy/k8s/overlays/*/relay.json

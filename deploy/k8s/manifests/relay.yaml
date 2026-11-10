@@ -1,0 +1,68 @@
+# freelog-relay: Sentry-compatible envelope endpoint → VictoriaLogs.
+# In-cluster DSN for apps: http://<key>@relay.freelog.svc:8080/<projectId>
+# Projects/keys come from the Secret "freelog-relay-config" (key relay.json), see relay.example.json.
+apiVersion: v1
+kind: Service
+metadata:
+  name: relay
+  labels: { app.kubernetes.io/name: freelog-relay }
+spec:
+  selector: { app.kubernetes.io/name: freelog-relay }
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relay
+  labels: { app.kubernetes.io/name: freelog-relay }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: freelog-relay }
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: freelog-relay
+        freelog.service: freelog-relay   # its own console logs are collected by Vector
+      annotations: {}
+    spec:
+      containers:
+        - name: relay
+          image: ghcr.io/reetus/freelog-relay:latest
+          env:
+            - name: FREELOG_CONFIG_FILE
+              value: /etc/freelog/relay.json
+            - name: FreeLog__VictoriaLogs__Url
+              value: http://victorialogs:9428
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/freelog
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          secret:
+            secretName: freelog-relay-config
+        - name: tmp
+          emptyDir: {}
