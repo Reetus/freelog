@@ -67,5 +67,5 @@ jobs:
         run: |
           docker compose --env-file /dev/null config --quiet
           docker compose --env-file /dev/null --profile grafana --profile glitchtip --profile demo config --quiet
-      - name: End-to-end: both ingestion paths into VictoriaLogs
+      - name: "End-to-end: both ingestion paths into VictoriaLogs"
         run: bash deploy/compose/smoke-test.sh
