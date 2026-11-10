@@ -1,0 +1,19 @@
+# Helm values for victoria-logs-single (https://victoriametrics.github.io/helm-charts/).
+server:
+  # Gives a stable service name: victorialogs.<namespace>.svc (used in vector-agent.yaml).
+  fullnameOverride: victorialogs
+  # Units: h, d, w, y (no unit = months). Minimum 24h.
+  retentionPeriod: 14d
+  # Oldest data is also dropped once this many GiB are used; keep below the volume size.
+  retentionDiskSpaceUsage: 45
+  persistentVolume:
+    enabled: true
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  podLabels:
+    freelog.collect: "false"

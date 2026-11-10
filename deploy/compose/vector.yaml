@@ -1,0 +1,67 @@
+# freelog: Vector agent for a Docker host.
+# Reads container logs through the Docker API (read-only); `docker logs` is unaffected.
+# Opt a container out with the label  freelog.collect=false  (e.g. apps that ship via the Sentry SDK).
+data_dir: /var/lib/vector
+
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  docker:
+    type: docker_logs
+    # Merge indented continuation lines (stack traces, MEL two-line console output) into one event.
+    multiline:
+      start_pattern: '^\S'
+      condition_pattern: '^\s'
+      mode: continue_through
+      timeout_ms: 1000
+
+transforms:
+  collectable:
+    type: filter
+    inputs: [docker]
+    condition: '.label."freelog.collect" != "false"'
+
+  docker_meta:
+    type: remap
+    inputs: [collectable]
+    source: |
+      labels = object(.label) ?? {}
+      .service = labels."freelog.service"
+      if .service == null { .service = labels."com.docker.compose.service" }
+      if .service == null { .service = .container_name }
+      .env = labels."freelog.env"
+      if .env == null { .env = get_env_var("FREELOG_ENV") ?? "default" }
+      .host = get_env_var("FREELOG_HOST") ?? .host
+      if labels."com.docker.compose.project" != null { .compose_project = labels."com.docker.compose.project" }
+      del(.label)
+      del(.source_type)
+      del(.container_created_at)
+
+  normalize:
+    type: remap
+    inputs: [docker_meta]
+    file: /etc/vector/vrl/normalize.vrl
+
+sinks:
+  victorialogs:
+    type: http
+    inputs: [normalize]
+    # Vector >= 0.5x no longer expands ${ENV} in config files by default; edit this URL when
+    # VictoriaLogs runs on another host (e.g. a Vector agent on each Docker host → one central VictoriaLogs).
+    uri: 'http://victorialogs:9428/insert/jsonline?_stream_fields=service,env,host&_msg_field=message&_time_field=timestamp'
+    encoding:
+      codec: json
+    framing:
+      method: newline_delimited
+    compression: gzip
+    healthcheck:
+      enabled: false
+    batch:
+      max_bytes: 4000000
+      timeout_secs: 1
+    buffer:
+      type: disk
+      max_size: 1073741824   # 1 GiB on disk while VictoriaLogs is unreachable
+      when_full: block       # back-pressure: Vector stops reading; logs stay in Docker's files

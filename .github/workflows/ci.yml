@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  dotnet:
+    name: .NET build, test, pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+      - name: Pack FreeLog.Logging (CI version)
+        run: dotnet pack src/FreeLog.Logging --no-build -c Release -o artifacts -p:Version=0.0.0-ci.${{ github.run_number }}
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results
+          path: TestResults/*.trx
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nuget-ci
+          path: artifacts/*
+
+  vector:
+    name: Vector config tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Docker pipeline + shared VRL
+        run: sh deploy/vector/test.sh
+      - name: Kubernetes pipeline
+        run: sh deploy/k8s/test.sh
+
+  smoke:
+    name: Compose smoke test
+    runs-on: ubuntu-latest
+    needs: [dotnet, vector]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate compose files (all profiles)
+        working-directory: deploy/compose
+        run: |
+          docker compose --env-file /dev/null config --quiet
+          docker compose --env-file /dev/null --profile grafana --profile glitchtip --profile demo config --quiet
+      - name: End-to-end: both ingestion paths into VictoriaLogs
+        run: bash deploy/compose/smoke-test.sh

@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      microsoft-extensions:
+        patterns: ["Microsoft.Extensions.*", "Microsoft.AspNetCore.*"]
+      sentry:
+        patterns: ["Sentry*"]
+      test:
+        patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "coverlet*"]
+
+  - package-ecosystem: docker
+    directories: ["/src/FreeLog.Relay", "/samples/DemoApp"]
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker-compose
+    directory: /deploy/compose
+    schedule: { interval: weekly }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }

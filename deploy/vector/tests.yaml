@@ -1,0 +1,149 @@
+# Unit tests for the Docker pipeline + shared VRL. Run with deploy/vector/test.sh
+tests:
+  - name: MEL AddJsonConsole line
+    inputs:
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: '{"Timestamp":"2026-11-10T10:00:00Z","EventId":12,"LogLevel":"Warning","Category":"Orders.Checkout","Message":"Order 42 slow","State":{"Message":"Order 42 slow","OrderId":42,"{OriginalFormat}":"Order {OrderId} slow"}}'
+          container_name: orders-api-1
+          host: abc123
+          label:
+            com.docker.compose.service: orders-api
+            com.docker.compose.project: shop
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "Order 42 slow")
+              assert_eq!(.level, "warn")
+              assert_eq!(.service, "orders-api")
+              assert_eq!(.compose_project, "shop")
+              assert_eq!(.OrderId, 42)
+              assert_eq!(.message_template, "Order {OrderId} slow")
+              assert_eq!(."category.name", "Orders.Checkout")
+              assert_eq!(."event.id", 12)
+              assert!(!exists(.State))
+              assert!(!exists(.Timestamp))
+              assert!(!exists(.label))
+              assert_eq!(.source, "container")
+
+  - name: MEL AddJsonConsole scopes become fields
+    inputs:
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: '{"EventId":0,"LogLevel":"Information","Category":"OrderSimulator","Message":"Order 1004 placed","State":{"OrderId":1004,"{OriginalFormat}":"Order {OrderId} placed"},"Scopes":[{"Message":"System.Collections.Generic.Dictionary`2[System.String,System.Object]","RequestId":"cc4989bad53f"},{"Message":"SpanId:b7ad, TraceId:0af7651916cd43dd8448eb211c80319c","SpanId":"b7ad","TraceId":"0af7651916cd43dd8448eb211c80319c"},{"Message":"Processing batch 7","BatchId":7,"{OriginalFormat}":"Processing batch {BatchId}"},"plain text scope",{"OrderId":"from-scope"}]}'
+          container_name: worker
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.OrderId, 1004)
+              assert_eq!(.RequestId, "cc4989bad53f")
+              assert_eq!(.BatchId, 7)
+              assert_eq!(.trace_id, "0af7651916cd43dd8448eb211c80319c")
+              assert_eq!(.scope, "Processing batch 7 => plain text scope")
+              assert!(!exists(.Scopes))
+              assert!(!exists(.Message))
+
+  - name: Serilog compact JSON with exception and implicit Information
+    inputs:
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: '{"@t":"2026-11-10T10:00:00Z","@mt":"Paid {Amount}","@m":"Paid 9.5","Amount":9.5,"@tr":"0af7651916cd43dd8448eb211c80319c","SourceContext":"Billing"}'
+          container_name: billing
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "Paid 9.5")
+              assert_eq!(.level, "info")
+              assert_eq!(.message_template, "Paid {Amount}")
+              assert_eq!(.trace_id, "0af7651916cd43dd8448eb211c80319c")
+              assert_eq!(.service, "billing")
+              assert_eq!(."category.name", "Billing")
+              assert!(!exists(."@t"))
+
+  - name: Serilog error with exception
+    inputs:
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: '{"@t":"2026-11-10T10:00:00Z","@mt":"Boom","@l":"Error","@x":"System.Exception: Boom\n   at X.Y()"}'
+          container_name: billing
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.level, "error")
+              assert_eq!(."exception.stacktrace", "System.Exception: Boom\n   at X.Y()")
+
+  - name: MEL simple console (two lines merged by multiline)
+    inputs:
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: "fail: Microsoft.AspNetCore.Server.Kestrel[13]\n      Connection id \"0HN\" unhandled exception.\n      System.InvalidOperationException: nope"
+          container_name: web
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.level, "error")
+              assert_eq!(."category.name", "Microsoft.AspNetCore.Server.Kestrel")
+              assert!(starts_with!(.message, "Connection id"))
+
+  - name: Generic JSON keeps app fields and explicit service
+    inputs:
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: '{"msg":"listening","level":"debug","port":8080,"service":"from-app","nested":{"a":1}}'
+          container_name: go-thing
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "listening")
+              assert_eq!(.level, "debug")
+              assert_eq!(.port, 8080)
+              assert_eq!(.service, "from-app")
+              assert_eq!(.nested.a, 1)
+
+  - name: Plain text and broken JSON stay as-is
+    inputs:
+      - insert_at: docker_meta
+        type: log
+        log_fields:
+          message: '{not json'
+          container_name: nginx
+          label:
+            freelog.service: edge
+            freelog.env: prod
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "{not json")
+              assert_eq!(.level, "info")
+              assert_eq!(.service, "edge")
+              assert_eq!(.env, "prod")
+
+  - name: Opted-out containers are dropped
+    inputs:
+      - insert_at: collectable
+        type: log
+        log_fields:
+          message: hello
+          label:
+            freelog.collect: "false"
+    no_outputs_from: [collectable]

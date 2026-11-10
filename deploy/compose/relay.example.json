@@ -1,0 +1,17 @@
+{
+  "FreeLog": {
+    "Projects": [
+      {
+        "Id": "1",
+        "Key": "demo0000000000000000000000000000",
+        "Service": "demo-sdk",
+        "Environment": "demo"
+      },
+      {
+        "Id": "2",
+        "Key": "REPLACE-with-output-of-openssl-rand-hex-16",
+        "Service": "orders-api"
+      }
+    ]
+  }
+}

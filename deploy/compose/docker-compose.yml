@@ -1,0 +1,159 @@
+# freelog: single-host log stack.
+#   cp .env.example .env && cp relay.example.json relay.json   (then edit keys)
+#   docker compose up -d                       # core: VictoriaLogs + Vector + relay
+#   docker compose --profile grafana up -d     # + Grafana on :3000
+#   docker compose --profile glitchtip up -d   # + GlitchTip on :8000 (error grouping/alerts)
+#   docker compose --profile demo up -d        # + demo apps that generate logs
+name: freelog
+
+x-no-collect: &no-collect
+  freelog.collect: "false"
+
+services:
+  victorialogs:
+    image: victoriametrics/victoria-logs:v1.52.0
+    command:
+      - -storageDataPath=/vlogs
+      - -retentionPeriod=${FREELOG_RETENTION:-14d}
+      - -retention.maxDiskSpaceUsageBytes=${FREELOG_MAX_DISK:-20GiB}
+      - -httpListenAddr=:9428
+    volumes:
+      - vlogs:/vlogs
+    ports:
+      # No built-in auth: bind to localhost only. Put a reverse proxy with auth in front for remote access.
+      - "127.0.0.1:${FREELOG_UI_PORT:-9428}:9428"
+    labels: *no-collect
+    restart: unless-stopped
+
+  vector:
+    image: timberio/vector:0.60.0-debian
+    environment:
+      FREELOG_ENV: ${FREELOG_ENV:-default}
+      FREELOG_HOST: ${FREELOG_HOST:-docker-host}
+      VECTOR_LOG: warn
+      # Reload on config change instead of restarting: the docker_logs source keeps no checkpoint,
+      # so lines written while Vector is down are not collected (they remain in `docker logs`).
+      VECTOR_WATCH_CONFIG: "true"
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - ../vector/normalize.vrl:/etc/vector/vrl/normalize.vrl:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - vector-data:/var/lib/vector
+    depends_on: [victorialogs]
+    labels: *no-collect
+    restart: unless-stopped
+
+  relay:
+    build:
+      context: ../..
+      dockerfile: src/FreeLog.Relay/Dockerfile
+    image: freelog-relay:local
+    environment:
+      FREELOG_CONFIG_FILE: /etc/freelog/relay.json
+      FreeLog__VictoriaLogs__Url: http://victorialogs:9428
+    volumes:
+      - ${FREELOG_RELAY_CONFIG:-./relay.json}:/etc/freelog/relay.json:ro
+    ports:
+      # Apps on other hosts send here (DSN: http://<key>@<this-host>:5080/<projectId>).
+      - "${FREELOG_RELAY_PORT:-5080}:8080"
+    labels:
+      freelog.service: freelog-relay   # the relay's own JSON console logs are collected by Vector
+    depends_on: [victorialogs]
+    restart: unless-stopped
+
+  grafana:
+    profiles: [grafana]
+    image: grafana/grafana:12.4.14
+    environment:
+      GF_PLUGINS_PREINSTALL_SYNC: victoriametrics-logs-datasource
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/freelog.yaml:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    labels: *no-collect
+    depends_on: [victorialogs]
+    restart: unless-stopped
+
+  # --- GlitchTip: exception grouping + alerts. The relay forwards errors to it per project (ForwardDsn). ---
+  glitchtip-postgres:
+    profiles: [glitchtip]
+    image: postgres:18
+    # GlitchTip's partitioned tables need more locks than the Postgres default.
+    command: -c max_locks_per_transaction=512
+    environment:
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_DB_PASSWORD:-glitchtip}
+      POSTGRES_DB: glitchtip
+    volumes:
+      - glitchtip-pg:/var/lib/postgresql
+    labels: *no-collect
+    restart: unless-stopped
+
+  glitchtip:
+    profiles: [glitchtip]
+    image: glitchtip/glitchtip:6.2.6
+    # GlitchTip only warns about a missing/placeholder SECRET_KEY (forgeable sessions); refuse to start instead.
+    command:
+      - sh
+      - -c
+      - |
+        case "$$SECRET_KEY" in ""|change_me|change-me*) echo "Set GLITCHTIP_SECRET_KEY in .env (openssl rand -hex 32)" >&2; exit 1;; esac
+        exec ./bin/start.sh
+    environment:
+      SERVER_ROLE: all_in_one
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_DB_PASSWORD:-glitchtip}@glitchtip-postgres:5432/glitchtip
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:-}   # required for this profile (checked by the command above)
+      # glitchtip = how the relay reaches it; add your public hostname when exposing it via a proxy.
+      ALLOWED_HOSTS: ${GLITCHTIP_ALLOWED_HOSTS:-localhost,127.0.0.1,glitchtip}
+      GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:-http://localhost:8000}
+      DEFAULT_FROM_EMAIL: ${GLITCHTIP_FROM_EMAIL:-glitchtip@localhost}
+      EMAIL_URL: ${GLITCHTIP_EMAIL_URL:-consolemail://}
+      ENABLE_USER_REGISTRATION: ${GLITCHTIP_ENABLE_REGISTRATION:-True}
+      # Keep it small: Postgres-only (no Valkey); logs live in VictoriaLogs, not here.
+      VALKEY_URL: ""
+      GLITCHTIP_ENABLE_LOGS: "False"
+      GLITCHTIP_ENABLE_UPTIME: "False"
+      GLITCHTIP_RETENTION_DAYS: ${GLITCHTIP_RETENTION_DAYS:-30}
+    volumes:
+      - glitchtip-uploads:/code/uploads
+    ports:
+      - "127.0.0.1:${GLITCHTIP_PORT:-8000}:8000"
+    labels:
+      freelog.service: glitchtip
+    depends_on: [glitchtip-postgres]
+    restart: unless-stopped
+
+  # --- demo: one app shipping via the Sentry SDK, one plain console app collected by Vector ---
+  demo-sdk:
+    profiles: [demo]
+    build:
+      context: ../..
+      dockerfile: samples/DemoApp/Dockerfile
+    image: freelog-demo:local
+    environment:
+      FreeLog__Dsn: http://demo0000000000000000000000000000@relay:8080/1
+      FreeLog__Service: demo-sdk
+      FreeLog__CaptureErrors: "true"   # errors also become GlitchTip issues when the project has a ForwardDsn
+      DOTNET_ENVIRONMENT: Demo
+    labels: *no-collect   # ships via the SDK; don't also collect stdout
+    depends_on: [relay]
+
+  demo-console:
+    profiles: [demo]
+    image: freelog-demo:local
+    environment:
+      DOTNET_ENVIRONMENT: Demo   # no DSN → console only
+      # Any .NET app: switch the built-in console logger to JSON without code changes, so template
+      # parameters and scopes (OrderId, RequestId, …) become searchable fields via Vector.
+      Logging__Console__FormatterName: json
+      Logging__Console__FormatterOptions__IncludeScopes: "true"
+    depends_on: [demo-sdk]
+
+volumes:
+  vlogs:
+  vector-data:
+  grafana-data:
+  glitchtip-pg:
+  glitchtip-uploads:

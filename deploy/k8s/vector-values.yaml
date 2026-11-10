@@ -1,0 +1,35 @@
+# Helm values for the official Vector chart (https://helm.vector.dev), DaemonSet ("Agent") role.
+# Vector config + VRL come from ConfigMaps built from files in this repo; see deploy/k8s/README.md.
+role: Agent
+
+image:
+  tag: 0.60.0-debian
+
+existingConfigMaps:
+  - freelog-vector-config     # vector-agent.yaml
+dataDir: /vector-data-dir
+
+env:
+  - name: FREELOG_ENV
+    value: production
+  - name: VECTOR_WATCH_CONFIG
+    value: "true"
+
+extraVolumes:
+  - name: freelog-vrl
+    configMap:
+      name: freelog-vector-vrl  # normalize.vrl
+extraVolumeMounts:
+  - name: freelog-vrl
+    mountPath: /vector-vrl
+    readOnly: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+podLabels:
+  freelog.collect: "false"   # don't collect Vector's own logs

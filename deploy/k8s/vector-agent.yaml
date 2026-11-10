@@ -1,0 +1,74 @@
+# freelog: Vector agent config for Kubernetes (DaemonSet). Tails /var/log/pods with checkpoints,
+# so `kubectl logs` is unaffected and nothing is lost across Vector restarts.
+# Opt a pod out with the pod label  freelog.collect=false.
+data_dir: /vector-data-dir
+
+api:
+  enabled: true
+  address: 127.0.0.1:8686
+
+sources:
+  k8s:
+    type: kubernetes_logs
+    extra_label_selector: "freelog.collect!=false"
+    extra_field_selector: "metadata.namespace!=kube-system"
+
+transforms:
+  # Merge indented continuation lines (stack traces, MEL two-line console output) into one event.
+  multiline:
+    type: reduce
+    inputs: [k8s]
+    group_by: [file, stream]
+    starts_when: |-
+      match(string(.message) ?? "", r'^\S')
+    expire_after_ms: 1000
+    merge_strategies:
+      message: concat_newline
+
+  k8s_meta:
+    type: remap
+    inputs: [multiline]
+    source: |
+      k = object(.kubernetes) ?? {}
+      labels = object(k.pod_labels) ?? {}
+      .service = labels."freelog.service"
+      if .service == null { .service = labels."app.kubernetes.io/name" }
+      if .service == null { .service = labels.app }
+      if .service == null { .service = k.container_name }
+      .env = labels."freelog.env"
+      if .env == null { .env = get_env_var("FREELOG_ENV") ?? "default" }
+      .namespace = k.pod_namespace
+      .pod = k.pod_name
+      .container_name = k.container_name
+      .image = k.container_image
+      .host = k.pod_node_name
+      del(.kubernetes)
+      del(.file)
+      del(.source_type)
+      del(.timestamp_end)
+
+  normalize:
+    type: remap
+    inputs: [k8s_meta]
+    file: /vector-vrl/normalize.vrl
+
+sinks:
+  victorialogs:
+    type: http
+    inputs: [normalize]
+    # In-cluster service from victorialogs-values.yaml (fullnameOverride: victorialogs, namespace freelog).
+    uri: 'http://victorialogs.freelog.svc:9428/insert/jsonline?_stream_fields=service,env,namespace&_msg_field=message&_time_field=timestamp'
+    encoding:
+      codec: json
+    framing:
+      method: newline_delimited
+    compression: gzip
+    healthcheck:
+      enabled: false
+    batch:
+      max_bytes: 4000000
+      timeout_secs: 1
+    buffer:
+      type: disk
+      max_size: 1073741824
+      when_full: block

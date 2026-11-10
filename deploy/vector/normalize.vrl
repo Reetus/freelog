@@ -1,0 +1,129 @@
+# freelog: shared normalization for container logs (Docker and Kubernetes).
+#
+# Input : .message (one raw log line, multiline stack traces already merged) plus metadata
+#         (.service, .env, .host, ...) set by the source-specific remap.
+# Output: the same field names freelog-relay writes for Sentry SDK logs:
+#         message, level, service, env, trace_id, span_id, message_template, category.name,
+#         exception.stacktrace, plus any other fields from JSON log lines.
+#
+# Understands: Microsoft.Extensions.Logging AddJsonConsole, Serilog CLEF (compact JSON),
+#              generic JSON (message/msg/level/severity), MEL plain-text console ("info: ...").
+
+.source = "container"
+raw = to_string(.message) ?? encode_json(.message)
+line = strip_whitespace(raw)
+level = null
+msg = null
+
+if starts_with(line, "{") {
+  parsed, err = parse_json(line)
+  if err == null && is_object(parsed) {
+    p = object!(parsed)
+
+    # MEL AddJsonConsole: template arguments live under "State".
+    if is_object(p.State) {
+      st = object!(p.State)
+      if is_string(st."{OriginalFormat}") { .message_template = st."{OriginalFormat}" }
+      st = remove!(st, ["{OriginalFormat}"])
+      st = remove!(st, ["Message"])
+      p = merge(p, st)
+      p = remove!(p, ["State"])
+    }
+
+    # MEL AddJsonConsole with IncludeScopes: "Scopes" is an array. Dictionary/KeyValue scopes
+    # (BeginScope(new Dictionary{...}), ASP.NET's RequestId/TraceId) become fields; text scopes
+    # (BeginScope("Processing {Id}", id)) are joined into .scope.
+    if is_array(p.Scopes) {
+      scope_texts = []
+      for_each(array!(p.Scopes)) -> |_i, sc| {
+        if is_object(sc) {
+          o = object!(sc)
+          if o."{OriginalFormat}" != null && is_string(o.Message) {
+            scope_texts = push(scope_texts, o.Message)
+          }
+          o = remove!(o, ["Message"])
+          o = remove!(o, ["{OriginalFormat}"])
+          p = merge(o, p) # the log's own fields win over scope fields
+        } else if is_string(sc) {
+          scope_texts = push(scope_texts, sc)
+        }
+      }
+      if length(scope_texts) > 0 { .scope = join(scope_texts, " => ") }
+      p = remove!(p, ["Scopes"])
+    }
+
+    msg = p.message
+    if msg == null { msg = p.msg }
+    if msg == null { msg = p.Message }
+    if msg == null { msg = p."@m" }
+    if msg == null { msg = p."@mt" }
+    if is_string(p."@mt") { .message_template = p."@mt" }
+
+    level = p.level
+    if level == null { level = p.Level }
+    if level == null { level = p.LogLevel }
+    if level == null { level = p.severity }
+    if level == null { level = p."@l" }
+
+    exc = p.exception
+    if exc == null { exc = p.Exception }
+    if exc == null { exc = p."@x" }
+    if exc != null { ."exception.stacktrace" = exc }
+
+    trace = p.trace_id
+    if trace == null { trace = p.TraceId }
+    if trace == null { trace = p."@tr" }
+    if trace != null { .trace_id = trace }
+
+    span = p.span_id
+    if span == null { span = p.SpanId }
+    if span == null { span = p."@sp" }
+    if span != null { .span_id = span }
+
+    category = p.Category
+    if category == null { category = p.SourceContext }
+    if category != null { ."category.name" = category }
+
+    if p.EventId != null && p.EventId != 0 { ."event.id" = p.EventId }
+
+    # Serilog CLEF omits @l for Information.
+    if level == null && p."@t" != null { level = "info" }
+
+    # Consumed keys; app timestamps are dropped in favour of the runtime's (always present, always UTC).
+    for_each(["message", "msg", "Message", "@m", "@mt", "level", "Level", "LogLevel", "severity", "@l",
+              "exception", "Exception", "@x", "trace_id", "TraceId", "@tr", "span_id", "SpanId", "@sp",
+              "Category", "SourceContext", "EventId", "@i", "@t", "timestamp", "Timestamp", "@timestamp",
+              "time", "ts"]) -> |_index, key| {
+      p = remove!(p, [key])
+    }
+
+    . = merge(., p)
+  }
+} else {
+  # MEL simple console: "info: Category[0]" header line, message on the following (indented) line.
+  m, err = parse_regex(raw, r'^(?P<lvl>trce|dbug|info|warn|fail|crit): (?P<cat>[^\s\[]+)\[(?P<eid>\d+)\]\s*\n?\s*(?P<rest>(?s:.*))$')
+  if err == null {
+    level = m.lvl
+    ."category.name" = m.cat
+    msg = m.rest
+  }
+}
+
+.message = if is_string(msg) && msg != "" { msg } else { raw }
+
+lvl = downcase(to_string(level) ?? "")
+.level = if lvl == "" || includes(["info", "information", "inf", "notice"], lvl) {
+  "info"
+} else if includes(["warn", "warning", "wrn"], lvl) {
+  "warn"
+} else if includes(["error", "err", "eror", "fail"], lvl) {
+  "error"
+} else if includes(["fatal", "critical", "crit", "ftl", "panic"], lvl) {
+  "fatal"
+} else if includes(["debug", "dbug", "dbg"], lvl) {
+  "debug"
+} else if includes(["trace", "trce", "verbose", "vrb"], lvl) {
+  "trace"
+} else {
+  lvl
+}

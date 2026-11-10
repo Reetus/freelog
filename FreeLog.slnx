@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/DemoApp/DemoApp.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/FreeLog.Logging/FreeLog.Logging.csproj" />
+    <Project Path="src/FreeLog.Relay/FreeLog.Relay.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FreeLog.Relay.Tests/FreeLog.Relay.Tests.csproj" />
+  </Folder>
+</Solution>

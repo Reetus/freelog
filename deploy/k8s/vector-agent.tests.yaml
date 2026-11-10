@@ -1,0 +1,35 @@
+tests:
+  - name: Pod metadata, multiline merge and JSON parsing
+    inputs:
+      - insert_at: multiline
+        type: log
+        log_fields:
+          message: "fail: Orders.Checkout[0]"
+          file: /var/log/pods/shop_orders-abc/orders/0.log
+          stream: stdout
+          kubernetes:
+            pod_namespace: shop
+            pod_name: orders-abc
+            container_name: orders
+            container_image: registry/orders:1.2
+            pod_node_name: node-1
+            pod_labels:
+              app.kubernetes.io/name: orders-api
+      - insert_at: multiline
+        type: log
+        log_fields:
+          message: "      Checkout failed"
+          file: /var/log/pods/shop_orders-abc/orders/0.log
+          stream: stdout
+    outputs:
+      - extract_from: normalize
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "orders-api")
+              assert_eq!(.namespace, "shop")
+              assert_eq!(.pod, "orders-abc")
+              assert_eq!(.host, "node-1")
+              assert_eq!(.level, "error")
+              assert_eq!(.message, "Checkout failed")
+              assert!(!exists(.kubernetes))

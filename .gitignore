@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+deploy/compose/relay.json
+deploy/compose/.env
+artifacts/
