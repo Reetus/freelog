@@ -6,6 +6,8 @@
     <Version>0.1.0</Version>
     <Description>Ships Microsoft.Extensions.Logging output (with exceptions and scopes) to freelog-relay via the Sentry SDK's structured logs. Self-hosted, no-budget logging with VictoriaLogs.</Description>
     <Authors>Reetus</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Copyright>Copyright (c) 2026 Reetus</Copyright>
     <PackageTags>logging;sentry;victorialogs;self-hosted;microsoft-extensions-logging</PackageTags>
     <PackageProjectUrl>https://github.com/Reetus/freelog</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Reetus/freelog</RepositoryUrl>

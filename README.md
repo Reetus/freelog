@@ -261,3 +261,7 @@ deploy/docker/daemon.json log rotation for Docker hosts
 ```
 
 Ideas for later: [IDEAS.md](IDEAS.md). Original design notes: [PLAN.md](PLAN.md).
+
+## License
+
+[MIT](LICENSE)
