@@ -1,0 +1,17 @@
+# Optional Grafana for freelog. Add "../../grafana" to an overlay's resources (see ../README.md).
+# An overlay can add its own dashboards with:
+#   configMapGenerator:
+#     - name: freelog-grafana-dashboards
+#       behavior: merge
+#       files: [dashboards/my-app.json]
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - grafana.yaml
+configMapGenerator:
+  - name: freelog-grafana-datasources
+    files: [datasources.yaml]
+  - name: freelog-grafana-dashboard-provider
+    files: [provider.yaml=dashboard-provider.yaml]
+  - name: freelog-grafana-dashboards
+    files: [dashboards/freelog-overview.json]

@@ -1,0 +1,387 @@
+{
+  "uid": "freelog-overview",
+  "title": "freelog overview",
+  "tags": [
+    "freelog",
+    "overview"
+  ],
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Logs by service",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "expr": "-kind:metric | stats by (service) count() logs",
+          "queryType": "statsRange",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 1,
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Logs by level",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "expr": "-kind:metric | stats by (level) count() logs",
+          "queryType": "statsRange",
+          "legendFormat": "{{level}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 2,
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors by service",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "expr": "-kind:metric (level:error OR level:fatal) | stats by (service) count() errors",
+          "queryType": "statsRange",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 3,
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Warnings by service",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "expr": "-kind:metric level:warn | stats by (service) count() warnings",
+          "queryType": "statsRange",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 4,
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "table",
+      "title": "Log volume in range",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "expr": "-kind:metric | stats by (service, source) count() logs | sort by (logs desc)",
+          "queryType": "stats"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ],
+      "description": "source = container (collected by Vector) or sentry-sdk (sent by the app through the relay).",
+      "id": 5,
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "table",
+      "title": "Custom metrics in range",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "expr": "kind:metric | stats by (service, metric.name) count() values | sort by (values desc)",
+          "queryType": "stats"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ],
+      "description": "Metric values emitted with SentrySdk.Metrics.* (one record per value).",
+      "id": 6,
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Recent errors",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "victorialogs"
+          },
+          "expr": "-kind:metric (level:error OR level:fatal)",
+          "queryType": "instant",
+          "maxLines": 200
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none",
+        "prettifyLogMessage": false
+      },
+      "id": 7,
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 10
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
+}

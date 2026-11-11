@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: freelog
+    folder: freelog
+    type: file
+    # Provisioned dashboards can be edited in the UI, but edits are overwritten on restart.
+    # Use "Save as" for your own copies; those are stored on the grafana-data volume.
+    allowUiUpdates: true
+    updateIntervalSeconds: 60
+    options:
+      path: /var/lib/grafana-dashboards

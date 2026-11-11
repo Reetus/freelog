@@ -81,3 +81,32 @@ sh deploy/k8s/test.sh
 kubectl -n freelog port-forward svc/victorialogs 9428:9428
 # open http://localhost:9428/select/vmui
 ```
+
+## Optional: Grafana (graphs, dashboards, column picker)
+
+vmui has no graph view for `stats` queries. `deploy/k8s/grafana/` adds Grafana with the VictoriaLogs datasource
+and a "freelog overview" dashboard provisioned (logs/errors/warnings by service, custom metrics, recent errors).
+
+```sh
+kubectl -n freelog create secret generic freelog-grafana-admin --from-literal=password="$(openssl rand -hex 16)"
+```
+
+Then add it to your overlay and apply as before:
+
+```yaml
+resources:
+  - ../../manifests
+  - ../../grafana
+configMapGenerator:            # optional: your own dashboards next to the overview
+  - name: freelog-grafana-dashboards
+    behavior: merge
+    files: [dashboards/my-app.json]
+```
+
+Log in as `admin` with the password from the Secret. Reach it with
+`kubectl -n freelog port-forward svc/grafana 3000:3000`, or put an Ingress in front of the `grafana` Service.
+
+Graph panels use the datasource's **Stats range** query type with a `stats` query, for example
+`kind:metric metric.name:orders.placed | stats by (region) sum(metric.value) orders` (no `_time:` bucket: Grafana sets the step).
+In **Explore**, the logs view lets you pick fields as table columns.
+Provisioned dashboards are reset on restart; use "Save as" for your own, which are kept on the `grafana-data` volume.
