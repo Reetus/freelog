@@ -1,5 +1,5 @@
 # Build from the repo root:  docker build -f src/FreeLog.Relay/Dockerfile -t freelog-relay .
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY src/FreeLog.Relay/FreeLog.Relay.csproj src/FreeLog.Relay/
 RUN dotnet restore src/FreeLog.Relay/FreeLog.Relay.csproj
