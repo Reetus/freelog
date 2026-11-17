@@ -1,5 +1,5 @@
 # Build from the repo root:  docker build -f samples/DemoApp/Dockerfile -t freelog-demo .
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY src/FreeLog.Logging/ src/FreeLog.Logging/
 COPY samples/DemoApp/ samples/DemoApp/
