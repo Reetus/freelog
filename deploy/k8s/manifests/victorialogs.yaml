@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: victorialogs
-          image: victoriametrics/victoria-logs:v1.52.0
+          image: victoriametrics/victoria-logs:v1.54.0
           args:
             - -storageDataPath=/vlogs
             - -httpListenAddr=:9428

@@ -10,10 +10,21 @@ updates:
         patterns: ["Sentry*"]
       test:
         patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "coverlet*"]
+    ignore:
+      # FreeLog.Logging is a library (net8.0;net10.0): keep minimum M.E/ASP.NET deps on the current
+      # major. Move majors deliberately together with a TargetFramework bump.
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
-    directories: ["/src/FreeLog.Relay", "/samples/DemoApp"]
+    directories: ["/src/FreeLog.Relay", "/samples/DemoApp", "/deploy/k8s/manifests", "/deploy/k8s/grafana"]
     schedule: { interval: weekly }
+    ignore:
+      # .NET base images must match the projects' TargetFramework; upgrade them together, by hand.
+      - dependency-name: "dotnet/*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker-compose
     directory: /deploy/compose
