@@ -44,7 +44,7 @@ spec:
         fsGroup: 472
       containers:
         - name: grafana
-          image: grafana/grafana:12.4.14
+          image: grafana/grafana:13.3.1
           env:
             # Installed before Grafana starts serving, so the provisioned datasource works immediately.
             - name: GF_PLUGINS_PREINSTALL_SYNC
